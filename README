@@ -1,1 +1,9 @@
 # First commit
+
+To start with the command line, initalize a python virtual environment with `python3 -m venv venv`.
+The virtual environment must then be activated with `source venv/bin/activate`.
+A virtual environment insures that installed packages will not leak out of this project.
+To exit the virtual environment at any time, the command `deactivate` can be issued.
+
+Todo
+Install packages
