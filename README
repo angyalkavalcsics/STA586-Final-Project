@@ -7,3 +7,6 @@ To exit the virtual environment at any time, the command `deactivate` can be iss
 
 Todo
 Install packages
+
+# Notes
+This code is formatted with [Python Black](https://pypi.org/project/black/)
