@@ -10,18 +10,11 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="Word counter")
 
     parser.add_argument(
-        "action",
-        help="action to be preformed on the database. Can be one of [init, matrix]",
-    )
-
-    parser.add_argument(
         "database",
         help="filename to the database. If DB not present, one will be created",
     )
 
-    parser.add_argument(
-        "-f", metavar="filename", dest="filename", help="filename to the input file"
-    )
+    parser.add_argument("filename", help="filename to the input file")
 
     return parser.parse_args()
 
@@ -60,11 +53,12 @@ def insert_words(first, second, table):
     # Assumes words are already in the `words` table
     db.execute(
         """
-    INSERT INTO {} (first_id, second_id, pair_count)
+    INSERT INTO {} (first_id, second_id, pair_count, pmi)
         SELECT
             w1.word_id AS first_id,
             w2.word_id AS second_id,
-            1 AS pair_count
+            1 AS pair_count,
+            0 as pmi
         FROM words w1
         CROSS JOIN words w2
         WHERE
@@ -77,6 +71,51 @@ def insert_words(first, second, table):
         ),
         (first, second),
     )
+
+
+def do_pmi(table):
+    print("Adding PMI to talbe", table)
+
+    db.execute(
+        """
+    WITH
+    joint AS (
+        SELECT 
+            first_id,
+            second_id,
+            CAST(pair_count AS REAL) / (SELECT SUM(pair_count) FROM {}) AS prob
+        FROM {}
+    ),
+    probs AS (
+        SELECT
+            word_id,
+            CAST(word_count AS REAL) / (SELECT SUM(word_count) FROM counts) AS prob
+        FROM counts
+    ),
+    pmis AS (
+        SELECT
+            joint.first_id,
+            joint.second_id,
+            log(joint.prob / (p1.prob * p2.prob)) AS pmi
+        FROM joint
+        INNER JOIN probs p1 ON(p1.word_id = joint.first_id)
+        INNER JOIN probs p2 ON(p2.word_id = joint.second_id)
+    )
+  --  select * from pmis where pmi is null;
+    UPDATE {} as t
+    SET pmi = (
+        SELECT pmi
+        FROM pmis
+        WHERE
+            t.first_id = pmis.first_id
+            and t.second_id = pmis.second_id
+    )
+    """.format(
+            table, table, table
+        )
+    )
+
+    db_connection.commit()
 
 
 # https://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
@@ -150,19 +189,18 @@ def load_file_filename(filename, db, db_connection):
         for line in file:
             add_line_to_database(line)
             next(counter)
-
         db_connection.commit()
+
+        do_pmi("no_gap")
+        do_pmi("one_gap")
 
 
 arguments = get_arguments()
 db_connection = sqlite3.connect(arguments.database)
+# https://docs.python.org/2/library/sqlite3.html#sqlite3.Connection.create_function
+db_connection.create_function("log", 1, math.log)
 db = db_connection.cursor()
 
 initalize_database(db_connection)
 
-if arguments.action == "init" and arguments.filename:
-    load_file_filename(arguments.filename, db, db_connection)
-elif arguments.action == "init" and not arguments.filename:
-    print("You must supply a filename with -f")
-elif arguments.action == "matrix":
-    print()
+load_file_filename(arguments.filename, db, db_connection)
