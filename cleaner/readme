@@ -1,0 +1,16 @@
+RAW TEXT CLEANER
+----------------
+Formats raw text input and outputs file for use in 
+training natural language recommendation model.
+
+use: (base) $> python cleaner.py inputFile outputFileName 
+----------------
+
+Requres nltk which is installed in the anaconda base environment. You must activate this environment 
+on the command line before running this program:
+
+$> conda activate base
+(base) $> cleaner.py inputFile outputFileName
+
+ntlk requires punkt for tokenization. the program will attempt to download this package each time but will only install
+if it isn't already present. 
