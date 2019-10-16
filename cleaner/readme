@@ -1,16 +1,30 @@
-RAW TEXT CLEANER
-----------------
-Formats raw text input and outputs file for use in 
-training natural language recommendation model.
+NAME
+	RAW TEXT CLEANER
 
-use: (base) $> python cleaner.py inputFile outputFileName 
-----------------
+SYNOPSIS
+	cleaner.py [options] <inputPath> <outputPath>
+
+DESCRIPTION
+	Formats raw text input and outputs file for use in training natural language recommendation model.
+	
+	Options are not mandatory and can be listed in any order. inputPath and outputPath are mandatory and must be listed 
+	as the final two arguments, respectively. 
+	
+	-b, --batch
+		process files in batch mode. inputPath argument must be a directory containing the .txt files to be processed.
+	-p, -d, --punkt, --download
+		download and install the punkt sentence tokenizer prior to cleaning data.
+	integer
+		an integer value of 1-10 as an option argument will set the minimum sentence length to that value. 
+
+NOTES 
+
+ex: $> cleaner.py -b 5 dirPath out.txt will process all files in dirPath and set the minimum sentence length to 5. 
 
 Requres nltk which is installed in the anaconda base environment. You must activate this environment 
 on the command line before running this program:
 
 $> conda activate base
-(base) $> cleaner.py inputFile outputFileName
+(base) $> cleaner.py [options] <inputFile> <outputFileName> 
 
-ntlk requires punkt for tokenization. the program will attempt to download this package each time but will only install
-if it isn't already present. 
+ntlk requires the punkt sentence tokenizer. using the -p or -d options will download punkt.   
