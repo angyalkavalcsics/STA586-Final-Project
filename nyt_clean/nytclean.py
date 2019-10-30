@@ -12,7 +12,7 @@ import time, requests
 dev_key = "dGbfLeJfxGPaMNH6uVDhuZo7JBdCNLJB"
 api = articleAPI(dev_key)
 
-out_stream = open("out.txt", "w+")
+out_stream = open("output.txt", "w+")
 
 def get_article(url_):
     r = requests.get(url_)
@@ -36,7 +36,7 @@ def worker(begin, end, npages=100):
     pages = pages if pages <=100 else 100 
     
     for page in range(1, pages+1):
-        print(str(page), "/", str(pages))
+        print("Page: ", str(page), "/", str(pages))
         b_time = time.time()
         articles = api.search(begin_date=begin, end_date=end, page=page)
         num_arts = len(articles['response']['docs'])
@@ -46,16 +46,8 @@ def worker(begin, end, npages=100):
             text = get_article(url)
             if text != -1:
                 out_stream.write(text)
-        if (time.time - b_time) < 6:
+        if (time.time() - b_time) < 6:
             time.sleep(6 - (time.time()-b_time))
 
+worker(20131231, 20141231)    
     
-    
-a = api.search(begin_date=20131231, end_date=20141231)
-h = a['response']['meta']['hits']
-na = len(a['response']['docs'])
-pages = 1012
-
-u = a['response']['docs'][8]['web_url']
-p = get_article(u)
-print(time.time())
