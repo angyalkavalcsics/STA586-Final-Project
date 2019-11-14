@@ -1,0 +1,328 @@
+from gensim.models import Word2Vec
+from nltk.corpus import words as ewords,\
+    wordnet,\
+    stopwords,\
+    reuters,\
+    brown,\
+    names
+import gensim,\
+    numpy as np,\
+    nltk.tokenize as tok,\
+    nltk,\
+    pickle,\
+    numpy
+
+#pip install -U gensim
+
+#nltk.download('words')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
+nltk.download('reuters')
+nltk.download('brown')
+nltk.download('names')
+    
+    
+##########################    
+### METHOD DEFINITIONS ###
+##########################
+    
+def scrub_file(input_file, min_len=3, verbose=False):
+    
+    print("Building go words...")
+    e_words = sorted(ewords.words())
+    b_words = sorted(set(brown.words()))[2312:]
+    r_words = sorted(set(reuters.words()))[1873:]
+    w_words = sorted(set(wordnet.words()))[357:]
+    
+    go = e_words + b_words + r_words + w_words
+    go = [i.lower() for i in set(go)]
+    
+    stop = [i for i in stopwords.words('english')] + [i.lower() for i in names.words()]
+    stop.extend(["a", "b", "c", "d", "e", "f", "g", "h", "i",
+              "j", "k", "l", "m", "n", "o", "p", "q", "r",
+              "s", "t", "u", "v", "w", "x", "y", "z",
+              "A", "B", "C", "D", "E", "F", "G", "H", "I",
+              "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+              "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "]", "^", "``"])
+
+    go = set(go)
+    go = go.difference(stop)
+    go = sorted([i for i in go if not i.isnumeric()])
+    
+    
+    
+    print("Reading file...")
+    input_stream = open(input_file, encoding='utf-8')
+    full_input_text = input_stream.read()
+    
+    print("Tokenizing sentences...")
+    raw_sentence_array = tok.sent_tokenize(full_input_text)
+    
+    sentences = []
+    
+    if verbose:
+        n = len(raw_sentence_array)
+        i = 0
+        print("Scrubbing...")
+        for sent in raw_sentence_array:
+            i+=1
+            if i%50 == 0 or i==1:
+                print(str(i) +"/" + str(n))
+            words = tok.word_tokenize(sent)
+            words = [w.lower() for w in words]
+            words = [w for w in words if w in go]
+            if len(words) >= min_len:
+                sentences.append(words)
+    else:
+        for sent in raw_sentence_array:
+            
+            words = tok.word_tokenize(sent)
+            words = [w.lower() for w in words if ((not w.isnumeric()) and (not (w in stop)) and (w in go))]
+            if len(words) >= min_len:
+                sentences.append(words)
+        
+    return sentences
+
+def convert_sentence(sent):
+    stop = set(stopwords.words('english'))
+    go = ewords.words() + [i for i in wordnet.words()]
+    words = tok.word_tokenize(sent)
+    words = [w.lower() for w in words if not w.lower() in stop and w.lower() in go]
+    return words
+
+##### One Hot code:
+def onehot_word(word, dictionary):
+    n = len(dictionary)
+    oh = np.zeros(n, ntype = 'uint8')
+    for w in range(n):
+        if word == dictionary[w]:
+            oh[w] = 1
+            break
+    return oh
+
+def onehot_sentence(sent, dictionary):
+    ohs = []
+    for i in sent:
+        ohs.append(onehot_word(i, dictionary))
+    return ohs
+
+def sat_test(model, clean_test_questions, qnum, csum=False):
+        
+    answers = []
+    
+    if not csum:
+        for i in qnum:
+            
+            try:
+                scores = []
+                for j in range(5):
+                    print(clean_test_questions[i][0])
+                    scores.append(
+                            model.wv.n_similarity(clean_test_questions[i][0],
+                                                  [clean_test_questions[i][1][j]]))
+                    
+                guess = np.argmax(scores)    
+                answers.append(guess)
+            except:
+                newguess = model.predict_output_word(clean_test_questions[i][0], topn = 1)
+                answers.append(newguess)
+                #print(i)
+        
+            
+            
+        
+    else:
+        for q in qnum:
+            scores = []
+            sent_len = len(clean_test_questions[q][0])
+            
+            try:
+                for ans in range(5):
+                    score = 0
+                    
+                    for k in range(sent_len):
+                        word = [clean_test_questions[q][0][k]]
+                        score += model.wv.n_similarity(word, [clean_test_questions[q][1][ans]])
+                    scores.append(score)
+                answers.append(np.argmax(scores))
+            except:
+                newguess = model.predict_output_word(clean_test_questions[q][0], topn = 1)                
+                answers.append(newguess)
+                #print(q)
+    return answers
+
+##########################
+### START FROM SCRATCH ###  
+##########################
+    
+## path of cleaned text file
+    # must use scrub_file(txt_path) before continuing. 
+
+
+#########################
+### LOAD SAVED PICKLE ###
+#########################
+
+## path of saved pickle object
+    # don't have to use scrub_file()
+    # proceed to training models w sentences object
+    ##### Note that the correct pickle file is located in the drive,
+    ##### under data --> sentences.zip --> sentences.pickle
+pickle_path = "C:\\Users\\Sammo\\Downloads\\nyt2005\\nyt2005_full.pickle"
+with open(pickle_path, "rb") as f:
+    sentences = pickle.load(f)
+
+pickle_path = "C:\\Users\\Sammo\\Downloads\\nyt2004\\nyt2004.pickle"
+with open(pickle_path, "rb") as f:
+    sentences2 = pickle.load(f)
+    
+pickle_path = "C:\\Users\\Sammo\\Downloads\\nyt2008\\nyt2008.pickle"
+with open(pickle_path, "rb") as f:
+    sentences3 = pickle.load(f)
+
+########################
+### BUILD DICTIONARY ###
+########################
+
+sentLen = len(sentences)
+# Flatten sentence list
+flat_sent = [y for x in sentences for y in x]
+flat_sentLen = len(flat_sent)
+# Create dictionary of unique words.
+dictionary = np.unique(flat_sent)
+
+
+#####################
+### MODEL FITTING ###
+#####################
+
+# Create CBOW model with hierarchical softmax
+CBOW_model_hs = gensim.models.word2vec.Word2Vec(
+    sentences=sentences,
+    window=5,
+    hs=1,
+    iter=10,
+    batch_words=20,
+    min_count=1,
+    cbow_mean=1,
+)
+
+# Create CBOW model with negative sampling
+CBOW_model_neg = gensim.models.word2vec.Word2Vec(
+    sentences=sentences,
+    window=4,
+    negative=10,
+    iter=10,
+    batch_words=10,
+    min_count=1,
+    cbow_mean=1,
+)
+
+# Create Skip-Gram model with hierarchical softmax
+SkipGram_model_hs = gensim.models.word2vec.Word2Vec(
+    sentences=sentences, window=4, hs=1, iter=10, batch_words=10, min_count=1, sg=1
+)
+
+SkipGram_model_hs.wv.doesnt_match("man woman child dog".split())
+SkipGram_model_hs.wv.most_similar(positive=['woman', 'king'], negative=['man', 'tomb'])
+SkipGram_model_hs.wv.similarity('door', 'window')
+
+# Create Skip_Gram model with negative sampling
+SkipGram_model_neg = gensim.models.word2vec.Word2Vec(
+    sentences=sentences, window=4, negative=10, iter=10, batch_words=10, min_count=1
+)
+# Some examples:
+v1 = CBOW_model_hs.wv["rain"]
+# Finds all similar words and provides a similarity index
+sim_words1 = CBOW_model_hs.wv.most_similar("away")
+# sim_words2 = CBOW_model_neg.wv.most_similar('away')
+
+
+sat_question_path = "C:\\Users\\Sammo\\Downloads\\sat_set\\cleaned_questions.pickle"
+sat_answer_numerical_path = "C:\\Users\\Sammo\\Downloads\\sat_set\\cleaned_answers_numerical.pickle"
+sat_answer_string_path = "C:\\Users\\Sammo\\Downloads\\sat_set\\cleaned_answers_strings.pickle"
+
+with open(sat_question_path, "rb") as f:
+    questions = pickle.load(f)
+with open(sat_answer_numerical_path, "rb") as f:
+    answers_numerical = pickle.load(f)
+with open(sat_answer_string_path, "rb") as f:
+    answers_strings = pickle.load(f)
+    
+
+# use allq to run on entire set of questions.
+# -1 as an answer indicates that wv.n_sim raised an error, likely due 
+# to a word not being in the model.
+    
+allq = [i for i in range(1039)]
+
+"""
+The format of the SAT testing set (cleaned_test.pickle) is as follows:
+    For each question, there is an entry of the form
+        
+        [ [question sentence words], [mult. choice answers] ]
+    
+    where
+        [question sentence words] is list of the individual words of the sentence 
+            and 
+        [mult. choice answers] is the list of multiple choice answers for the question
+---
+sat_test(model, clean_test_question, qnum, csum=False)
+args:
+    model: name of the model object to test
+    clean_test_questions: contents of cleaned_test.pickle
+    qnum: list of question numbers to evaluate. to evaluate a single question
+        number n, pass qnum=[n]
+    csum: calculate the sum of the individual similarities between each word in
+        the question sentence and the proposed answer, as in the tang paper. 
+        
+        if false, calculate the similarity of the proposed answer with the SET
+            of question sentence words. 
+returns:
+    list of answers whose indicies are consistent with the indicies of the questions
+    passed in with qnum.  
+    
+examples:
+    guess the answers to questions 6,7,8 wuth CBOW Heirarc. Softmax by summing
+    the individual similarities. 
+    
+        
+        out = sat_test(CBOW_model_hs, questions, [6,7,8], csum=True)
+        
+    guess the answer to question 10 with CBOW Heirarc Softmax by considering
+    the sentence words as a set
+        out = sat_test(CBOW_model_hs, questions, [10])
+    
+"""
+
+
+out = sat_test(CBOW_model_hs, questions, [8], csum = True)
+print(out)
+
+"""
+v1 contains the vector representation for the word 'rain'
+By default, this is a 100 dim vector
+"""
+
+"""
+sentences := our corpus
+window := how many words around the word will be considered for context
+CBOW_mean = 1 for CBOW, 0 else
+sg := 1 for skip-gram, otherwise cbow
+hs := 1 if hierarchical softmax will be used for training
+negative := if >0 then negative sampling is used 
+typically between 5-20 for how many noise words should be drawn
+ns_exponent := default of 0.75 has proven to be superior in research
+alpha := initial learning rate
+iter := number of epochs
+batch_words := target size in words for batches
+compute_loss := true/false
+"""
+"""
+A note on Gensim objects:
+Vocabulary: This object represents the vocabulary 
+(sometimes called Dictionary in gensim) of the model. 
+Besides keeping track of all unique words, this object 
+provides extra functionality, such as constructing a huffman tree 
+(frequent words are closer to the root), or discarding extremely rare words.
+"""
