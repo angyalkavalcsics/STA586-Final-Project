@@ -1,4 +1,5 @@
 from gensim.models import Word2Vec
+import pandas as pd
 from nltk.corpus import words as ewords,\
     wordnet,\
     stopwords,\
@@ -106,17 +107,15 @@ def onehot_sentence(sent, dictionary):
         ohs.append(onehot_word(i, dictionary))
     return ohs
 
-def sat_test(model, clean_test_questions, qnum, csum=False):
-        
+def sat_test(model, clean_test_questions, allq, csum=False):
     answers = []
     
     if not csum:
-        for i in qnum:
+        for i in allq:
             
             try:
                 scores = []
                 for j in range(5):
-                    print(clean_test_questions[i][0])
                     scores.append(
                             model.wv.n_similarity(clean_test_questions[i][0],
                                                   [clean_test_questions[i][1][j]]))
@@ -127,12 +126,10 @@ def sat_test(model, clean_test_questions, qnum, csum=False):
                 newguess = model.predict_output_word(clean_test_questions[i][0], topn = 1)
                 answers.append(newguess)
                 #print(i)
-        
-            
             
         
     else:
-        for q in qnum:
+        for q in allq:
             scores = []
             sent_len = len(clean_test_questions[q][0])
             
@@ -144,12 +141,21 @@ def sat_test(model, clean_test_questions, qnum, csum=False):
                         word = [clean_test_questions[q][0][k]]
                         score += model.wv.n_similarity(word, [clean_test_questions[q][1][ans]])
                     scores.append(score)
-                answers.append(np.argmax(scores))
+                    guess = np.argmax(scores)
+                answers.append(guess)
             except:
                 newguess = model.predict_output_word(clean_test_questions[q][0], topn = 1)                
                 answers.append(newguess)
                 #print(q)
     return answers
+
+def comp_res(answers, test_answers_numerical):
+    count = 0
+    for i in range(len(answers)):
+        if(answers[i] == test_answers_numerical[i]):
+            count += 1
+    test_score = count/1040
+    return test_score
 
 ##########################
 ### START FROM SCRATCH ###  
@@ -248,7 +254,6 @@ with open(sat_answer_numerical_path, "rb") as f:
     answers_numerical = pickle.load(f)
 with open(sat_answer_string_path, "rb") as f:
     answers_strings = pickle.load(f)
-    
 
 # use allq to run on entire set of questions.
 # -1 as an answer indicates that wv.n_sim raised an error, likely due 
@@ -295,9 +300,13 @@ examples:
     
 """
 
+answers_CBOW_hs = sat_test(CBOW_model_hs, questions, allq, csum = True)
+correct_CBOW_hs = comp_res(answers_CBOW_hs, answers_numerical)
 
-out = sat_test(CBOW_model_hs, questions, [8], csum = True)
-print(out)
+answers_SkipGram_neg = sat_test(SkipGram_model_neg, questions, allq, csum = True)
+correct_SkipGram_neg = comp_res(answers_SkipGram_neg, answers_numerical)
+
+
 
 """
 v1 contains the vector representation for the word 'rain'
